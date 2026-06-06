@@ -1,0 +1,77 @@
+==========================================================
+   KAISAR WOK — Daftar Kerjaan
+   Panduan Upload ke Hostinger (WEBSITE BARU, terpisah)
+==========================================================
+
+Tujuan: aplikasi ini jadi website SENDIRI di Hostinger,
+terpisah dari website Kaisar Wok yang sudah ada.
+
+----------------------------------------------------------
+LANGKAH 1 — Tambah Website baru di Hostinger
+----------------------------------------------------------
+1. Masuk hPanel Hostinger.
+2. Menu: Websites  >  + Add Website  (atau "Create / Add").
+3. Pilih domain/alamat untuk aplikasi ini (pilih salah satu):
+   a) Domain baru yang kamu punya (mis. tugaskaisarwok.com), ATAU
+   b) Subdomain baru, mis. buat "tugas" di domain mana pun
+      yang kamu punya selain kaisarwok (Domains > Subdomains), ATAU
+   c) Domain gratis/sementara dari Hostinger untuk tes.
+4. Selesai dibuat, catat NAMA FOLDER website-nya
+   (biasanya: public_html  milik website baru itu, BUKAN
+    folder website Kaisar Wok).
+
+----------------------------------------------------------
+LANGKAH 2 — Buat Database MySQL
+----------------------------------------------------------
+1. Menu: Databases  >  MySQL Databases.
+2. Buat database baru, contoh nama: kaisarwok_tugas
+   - Catat: NAMA DATABASE  (mis. u123456789_kaisarwok)
+   - Catat: USERNAME        (mis. u123456789_kaisar)
+   - Catat: PASSWORD        (buat password & catat)
+
+----------------------------------------------------------
+LANGKAH 3 — Isi file config.php
+----------------------------------------------------------
+Buka "config.php" (Notepad), ganti sesuai Langkah 2:
+
+   define('DB_HOST', 'localhost');                <- biarkan
+   define('DB_NAME', 'u123456789_kaisarwok');     <- NAMA DATABASE
+   define('DB_USER', 'u123456789_kaisar');        <- USERNAME
+   define('DB_PASS', 'PASSWORD_DATABASE_KAMU');   <- PASSWORD
+
+Password petinggi bisa diganti di:
+   define('ADMIN_PASSWORD', 'AdminKaisarWok');
+Simpan.
+
+----------------------------------------------------------
+LANGKAH 4 — Upload semua file
+----------------------------------------------------------
+1. hPanel > Files > File Manager.
+2. MASUK ke folder website BARU (Langkah 1) — biasanya
+   public_html milik website/domain baru itu.
+   (Hati-hati: jangan masuk ke folder website Kaisar Wok.)
+3. Upload file  KAISAR-WOK-HOSTINGER.zip  ke situ,
+   lalu klik kanan > Extract.
+   (Atau upload satu per satu semua isi folder "hostinger".)
+4. Pastikan folder "uploads" ada & bisa ditulis (Permissions 755).
+
+----------------------------------------------------------
+LANGKAH 5 — Buka & tes
+----------------------------------------------------------
+- Buka alamat website baru itu di browser/HP.
+- Tabel database "tasks" dibuat OTOMATIS saat pertama dibuka.
+- Coba: tambah tugas di Marketing/Staff, upload foto bukti,
+  lalu buka Petinggi (password: AdminKaisarWok) untuk approve.
+
+Selesai! Aplikasi tugas jadi website sendiri, terpisah dari
+web Kaisar Wok. Semua staff tinggal buka alamatnya dari HP,
+kapan saja. Data & foto aman di Hostinger.
+
+----------------------------------------------------------
+Catatan
+----------------------------------------------------------
+- Ganti password petinggi: edit ADMIN_PASSWORD di config.php.
+- Halaman blank/error 500: cek lagi 4 baris di config.php
+  (nama db/user/pass paling sering salah ketik).
+- Backup data: hPanel > Databases > phpMyAdmin > Export.
+==========================================================

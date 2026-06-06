@@ -1,0 +1,15 @@
+# Rahasia — JANGAN di-commit (berisi password DB & akun)
+config.php
+
+# Foto bukti yang diupload (data runtime)
+uploads/*
+!uploads/.gitkeep
+
+# Database preview lokal
+*.db
+preview.db
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

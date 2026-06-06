@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kaisar Wok — Daftar Kerjaan</title>
+<link rel="stylesheet" href="styles.css">
+<script src="auth.js"></script>
+</head>
+<body>
+<div class="container">
+  <div class="brand">
+    <img src="logo.png" alt="Kaisar Wok" class="brand-logo"
+         onload="var f=document.getElementById('bf');if(f)f.style.display='none';"
+         onerror="this.remove();">
+    <div class="brand-fallback" id="bf">
+      <svg class="emblem" viewBox="0 0 100 100" fill="none" stroke="#d4af37" stroke-width="2">
+        <circle cx="50" cy="50" r="46" stroke-width="2"/>
+        <circle cx="50" cy="50" r="40" stroke-width="1"/>
+        <path d="M27 57 Q50 80 73 57" stroke-width="2.6" stroke-linecap="round"/>
+        <line x1="22" y1="55.5" x2="30" y2="58" stroke-linecap="round"/>
+        <line x1="78" y1="55.5" x2="70" y2="58" stroke-linecap="round"/>
+        <path d="M44 52 q-5 -8 1 -13 q5 -4 0 -9" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M52 52 q5 -8 -1 -13 q-5 -4 0 -9" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <div class="wordmark">
+        <span class="brand-name">Kaisar Wok</span>
+        <span class="brand-tag">Imperial Cuisine • Chinese • Indonesia</span>
+      </div>
+    </div>
+  </div>
+  <div class="divider"></div>
+
+  <header class="page">
+    <h1>Sistem Daftar Kerjaan</h1>
+    <p>Pilih halaman sesuai peran kamu</p>
+  </header>
+
+  <div class="home-grid">
+    <a class="home-card" href="marketing.html">
+      <div class="icon">📣</div>
+      <h3>Marketing</h3>
+      <p>Daftar tugas tim marketing</p>
+    </a>
+    <a class="home-card" href="staff.html">
+      <div class="icon">👨‍🍳</div>
+      <h3>Staff Lainnya</h3>
+      <p>Daftar tugas staff lain</p>
+    </a>
+    <a class="home-card" href="kalender.html">
+      <div class="icon">📅</div>
+      <h3>Kalender</h3>
+      <p>Lihat tugas & reservasi per tanggal</p>
+    </a>
+    <a class="home-card" href="reservasi.html">
+      <div class="icon">🍽️</div>
+      <h3>Reservasi</h3>
+      <p>Catat reservasi tamu per tanggal</p>
+    </a>
+    <a class="home-card" href="admin.html">
+      <div class="icon">👑</div>
+      <h3>Petinggi</h3>
+      <p>Approve / tolak tugas</p>
+    </a>
+  </div>
+
+  <p class="note">Tugas dianggap <b style="color:var(--gold-soft)">selesai</b> setelah di-approve petinggi.</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Masuk — Kaisar Wok</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container" style="max-width:430px;">
+  <div class="brand" style="margin-top:36px;">
+    <img src="logo.png" alt="Kaisar Wok" class="brand-logo" style="max-height:90px;"
+         onload="var f=document.getElementById('bf');if(f)f.style.display='none';"
+         onerror="this.remove();">
+    <div class="brand-fallback" id="bf">
+      <span class="brand-name" style="font-size:34px;">Kaisar Wok</span>
+    </div>
+  </div>
+
+  <div class="login-box">
+    <div class="lock">🔐</div>
+    <h2>Masuk</h2>
+    <p>Login dulu untuk mengakses sistem</p>
+    <div class="err" id="err"></div>
+    <input id="username" type="text" placeholder="Username" autocomplete="username">
+    <div class="pw-wrap">
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+      <button type="button" class="pw-eye" id="eyeBtn" onclick="togglePw()" title="Lihat password">👁️</button>
+    </div>
+    <button onclick="doLogin()">Masuk</button>
+    <p class="note" style="margin-top:14px;">Hubungi petinggi jika lupa akun.</p>
+  </div>
+</div>
+
+<script>
+async function doLogin(){
+  const username=document.getElementById('username').value.trim();
+  const password=document.getElementById('password').value;
+  if(!username||!password){ document.getElementById('err').textContent='Isi username & password.'; return; }
+  try{
+    const r=await fetch('api.php?action=login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+    const j=await r.json();
+    if(j.ok){ location.href='index.html'; }
+    else{ document.getElementById('err').textContent=j.error||'Username atau password salah'; }
+  }catch(e){ document.getElementById('err').textContent='Gagal terhubung ke server.'; }
+}
+function togglePw(){
+  const p=document.getElementById('password'), b=document.getElementById('eyeBtn');
+  if(p.type==='password'){ p.type='text'; b.textContent='🙈'; } else { p.type='password'; b.textContent='👁️'; }
+}
+document.getElementById('password').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('username').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('password').focus(); });
+// kalau sudah login, langsung ke beranda
+fetch('api.php?action=me').then(r=>r.json()).then(u=>{ if(u&&u.loggedIn) location.href='index.html'; }).catch(()=>{});
+</script>
+</body>
+</html>

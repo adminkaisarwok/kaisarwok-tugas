@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reservasi — Kaisar Wok</title>
+<link rel="stylesheet" href="styles.css">
+<script src="auth.js"></script>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand-mini">
+    <img src="logo.png" alt="Kaisar Wok" class="logo-mini"
+         onerror="this.remove();document.getElementById('bm').style.display='flex';">
+    <div id="bm" style="display:none;align-items:center;gap:10px;">
+      <svg class="emblem-mini" viewBox="0 0 100 100" fill="none" stroke="#d4af37" stroke-width="3">
+        <circle cx="50" cy="50" r="46"/><path d="M27 57 Q50 80 73 57" stroke-linecap="round"/>
+        <path d="M44 52 q-5 -8 1 -13" stroke-width="2"/><path d="M52 52 q5 -8 -1 -13" stroke-width="2"/>
+      </svg>
+      <span class="mini-name">Kaisar Wok</span>
+    </div>
+  </div>
+  <span class="spacer"></span>
+  <a href="index.html">Beranda</a>
+  <a href="marketing.html">Marketing</a>
+  <a href="staff.html">Staff</a>
+  <a href="kalender.html">Kalender</a>
+  <a href="reservasi.html" class="active">Reservasi</a>
+  <a href="admin.html">Petinggi</a>
+</div>
+
+<div class="container">
+  <header class="page">
+    <h1>🍽️ Reservasi Tamu</h1>
+    <p>Catat reservasi pada tanggal yang dipesan</p>
+  </header>
+
+  <div class="add-card">
+    <h3>Tambah Reservasi</h3>
+    <div class="add-row">
+      <input id="rName" type="text" placeholder="Nama tamu" style="flex:1 1 220px;">
+      <input id="rDate" type="date" style="flex:0 1 160px; color-scheme:light;">
+      <input id="rTime" type="time" style="flex:0 1 120px; color-scheme:light;">
+      <input id="rPax" type="number" min="1" placeholder="Jumlah orang" style="flex:0 1 140px;">
+      <input id="rPhone" type="tel" placeholder="No. HP / WhatsApp" style="flex:1 1 180px;">
+      <input id="rDp" type="number" min="0" placeholder="DP / Uang muka (Rp)" style="flex:0 1 200px;">
+      <textarea id="rNote" placeholder="Catatan (mis. meja VIP, ulang tahun, alergi...)"></textarea>
+      <button onclick="addResv()">+ Tambah Reservasi</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Daftar Reservasi <span class="count" id="count">0</span></h2>
+    <div id="list"></div>
+  </div>
+
+  <p class="note">Reservasi juga otomatis tampil di halaman <b style="color:var(--gold-soft)">Kalender</b>.</p>
+</div>
+
+<script>
+const API='api.php';
+let cache=[];
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtRp(n){ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function fmtDay(ds){ return new Date(ds+'T00:00').toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); }
+function waLink(phone){
+  let p=String(phone).replace(/[^0-9]/g,'');
+  if(p.startsWith('0')) p='62'+p.slice(1);
+  return 'https://wa.me/'+p;
+}
+function gcalUrl(r){
+  const start=r.date.replace(/-/g,'');
+  let dt;
+  if(r.time){ // event berwaktu 2 jam
+    const [h,m]=r.time.split(':');
+    const s=new Date(r.date+'T'+r.time); const e=new Date(s.getTime()+2*60*60*1000);
+    const f=x=>`${x.getFullYear()}${String(x.getMonth()+1).padStart(2,'0')}${String(x.getDate()).padStart(2,'0')}T${String(x.getHours()).padStart(2,'0')}${String(x.getMinutes()).padStart(2,'0')}00`;
+    dt=f(s)+'/'+f(e);
+  } else {
+    const d=new Date(r.date+'T00:00'); d.setDate(d.getDate()+1);
+    const end=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    dt=start+'/'+end;
+  }
+  const text=encodeURIComponent(`Reservasi: ${r.name}`+(r.pax?` (${r.pax} org)`:''));
+  let det=''; if(r.phone) det+=`HP: ${r.phone}\n`; if(r.dp) det+=`DP: Rp${Number(r.dp).toLocaleString('id-ID')}\n`; if(r.note) det+=`Catatan: ${r.note}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dt}&details=${encodeURIComponent(det)}`;
+}
+
+async function load(){
+  try{ const r=await fetch(API+'?action=resvList'); cache=await r.json(); draw(); }catch(e){ console.error(e); }
+}
+async function addResv(){
+  const name=document.getElementById('rName').value.trim();
+  const date=document.getElementById('rDate').value;
+  const time=document.getElementById('rTime').value;
+  const pax=document.getElementById('rPax').value;
+  const phone=document.getElementById('rPhone').value.trim();
+  const dp=document.getElementById('rDp').value;
+  const note=document.getElementById('rNote').value.trim();
+  if(!name){ alert('Isi nama tamu dulu.'); return; }
+  if(!date){ alert('Pilih tanggal reservasi.'); return; }
+  await fetch(API+'?action=resvAdd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,date,time,pax,phone,dp,note})});
+  document.getElementById('rName').value=''; document.getElementById('rTime').value='';
+  document.getElementById('rPax').value=''; document.getElementById('rPhone').value='';
+  document.getElementById('rDp').value=''; document.getElementById('rNote').value='';
+  load();
+}
+async function delResv(id){
+  if(!confirm('Hapus reservasi ini?')) return;
+  await fetch(API+'?action=resvDelete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  load();
+}
+function resvHtml(r){
+  const past = r.date < todayStr();
+  const when = `📅 <b>${fmtDay(r.date)}</b>` + (r.time?` &middot; ⏰ <b>${r.time}</b>`:'');
+  let meta=[];
+  if(r.phone) meta.push('📞 '+escapeHtml(r.phone));
+  if(r.dp) meta.push('💰 DP '+fmtRp(r.dp));
+  if(r.note) meta.push('📝 '+escapeHtml(r.note));
+  let a='';
+  if(r.phone) a+=`<a class="btn-wa" href="${waLink(r.phone)}" target="_blank" rel="noopener">💬 WhatsApp</a>`;
+  a+=`<a class="btn-cal" href="${gcalUrl(r)}" target="_blank" rel="noopener">📆 + Calendar</a>`;
+  a+=`<button class="btn-del" onclick="delResv(${r.id})">Hapus</button>`;
+  return `<div class="resv ${past?'past':''}">
+    <div class="resv-top"><span class="resv-name"><span class="ic">🍽️</span> ${escapeHtml(r.name)}</span>${r.pax?`<span class="pax">${r.pax} org</span>`:''}</div>
+    <div class="resv-when">${when}</div>
+    ${meta.length?`<div class="resv-meta">${meta.join(' &nbsp;·&nbsp; ')}</div>`:''}
+    <div class="resv-actions">${a}</div>
+  </div>`;
+}
+function draw(){
+  document.getElementById('count').textContent=cache.length;
+  if(!cache.length){ document.getElementById('list').innerHTML='<div class="empty">Belum ada reservasi</div>'; return; }
+  // kelompokkan per tanggal
+  let html=''; let lastDate=null;
+  cache.forEach(r=>{
+    if(r.date!==lastDate){ html+=`<div class="daygroup">${fmtDay(r.date)}</div>`; lastDate=r.date; }
+    html+=resvHtml(r);
+  });
+  document.getElementById('list').innerHTML=html;
+}
+document.getElementById('rDate').value=todayStr();
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staff — Kaisar Wok</title>
+<link rel="stylesheet" href="styles.css">
+<script src="auth.js"></script>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand-mini">
+    <img src="logo.png" alt="Kaisar Wok" class="logo-mini"
+         onerror="this.remove();document.getElementById('bm').style.display='flex';">
+    <div id="bm" style="display:none;align-items:center;gap:10px;">
+      <svg class="emblem-mini" viewBox="0 0 100 100" fill="none" stroke="#d4af37" stroke-width="3">
+        <circle cx="50" cy="50" r="46"/><path d="M27 57 Q50 80 73 57" stroke-linecap="round"/>
+        <path d="M44 52 q-5 -8 1 -13" stroke-width="2"/><path d="M52 52 q5 -8 -1 -13" stroke-width="2"/>
+      </svg>
+      <span class="mini-name">Kaisar Wok</span>
+    </div>
+  </div>
+  <span class="spacer"></span>
+  <a href="index.html">Beranda</a>
+  <a href="marketing.html">Marketing</a>
+  <a href="staff.html" class="active">Staff</a>
+  <a href="kalender.html">Kalender</a>
+  <a href="reservasi.html">Reservasi</a>
+  <a href="admin.html">Petinggi</a>
+</div>
+
+<div class="container">
+  <header class="page">
+    <h1>👨‍🍳 Tugas Staff Lainnya</h1>
+    <p>Halaman untuk staff lain</p>
+  </header>
+  <div class="center"><span class="badge-cat">Kategori: Staff Lainnya</span></div>
+
+  <div class="add-card">
+    <h3>Tambah Tugas Baru</h3>
+    <div class="add-row">
+      <input id="nameInput" type="text" placeholder="Nama kamu" style="flex:0 1 150px;">
+      <input id="dateInput" type="date" style="flex:0 1 150px; color-scheme:light;">
+      <input id="taskInput" type="text" placeholder="Tulis tugas staff...">
+      <input id="linkInput" type="url" placeholder="🔗 Link video/referensi (opsional)" style="flex:1 1 100%;">
+      <button onclick="addTask()" style="flex:1 1 100%;">+ Tambah Tugas</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Daftar Tugas <span class="count" id="count">0</span></h2>
+    <div id="list"></div>
+  </div>
+
+  <p class="note">Tugas selesai setelah di-approve petinggi. Data tersimpan di server (tersinkron ke semua perangkat).</p>
+</div>
+
+<input type="file" id="photoInput" accept="image/*" style="display:none">
+
+<script>
+const API='api.php', CATEGORY='staff';
+const STATUS={ todo:{label:'Dikerjakan',cls:'todo'}, pending:{label:'Menunggu Approval',cls:'pending'}, approved:{label:'✓ Selesai',cls:'approved'} };
+let cache=[];
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(ts){ return new Date(ts).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}); }
+function todayStr(){ const d=new Date(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${d.getFullYear()}-${m}-${day}`; }
+function fmtDay(ds){ return new Date(ds+'T00:00').toLocaleDateString('id-ID',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }
+function fmtStamp(ts){ return new Date(ts).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+const CATLBL={marketing:'Marketing',staff:'Staff Lainnya'};
+function gcalUrl(t){
+  if(!t.date) return '';
+  const start=t.date.replace(/-/g,'');
+  const d=new Date(t.date+'T00:00'); d.setDate(d.getDate()+1);
+  const end=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  const text=encodeURIComponent(`[${CATLBL[t.category]||t.category}] ${t.title}`);
+  let det=`Oleh: ${t.name||'-'}`; if(t.link) det+=`\nLink: ${t.link}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${start}/${end}&details=${encodeURIComponent(det)}`;
+}
+
+let photoTaskId=null;
+function pickPhoto(id){ photoTaskId=id; const inp=document.getElementById('photoInput'); inp.value=''; inp.click(); }
+function compressImage(file, maxDim, quality){
+  return new Promise((resolve,reject)=>{
+    const img=new Image(); const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      let w=img.width, h=img.height;
+      if(w>h && w>maxDim){ h=Math.round(h*maxDim/w); w=maxDim; }
+      else if(h>maxDim){ w=Math.round(w*maxDim/h); h=maxDim; }
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror=reject; img.src=url;
+  });
+}
+async function delPhoto(id){
+  if(!confirm('Hapus foto bukti ini?')) return;
+  await fetch(API+'?action=deletePhoto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  load();
+}
+async function setLink(id){
+  const t=cache.find(x=>x.id===id); const current=t?(t.link||''):'';
+  const link = prompt('Tempel link video/referensi (kosongkan untuk hapus):', current);
+  if(link===null) return;
+  await fetch(API+'?action=link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id, link:link.trim()})});
+  load();
+}
+
+async function load(){
+  try{ const r=await fetch(API+'?action=list'); cache=await r.json(); draw(); }catch(e){ console.error(e); }
+}
+async function addTask(){
+  const n=document.getElementById('nameInput'); const i=document.getElementById('taskInput');
+  const date=document.getElementById('dateInput').value;
+  const link=document.getElementById('linkInput').value.trim();
+  const name=n.value.trim(); const title=i.value.trim(); if(!title) return;
+  localStorage.setItem('namaKaisarWok', name); // ingat nama untuk berikutnya
+  i.value=''; document.getElementById('linkInput').value='';
+  await fetch(API+'?action=add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,name,date,link,category:CATEGORY})});
+  load();
+}
+async function setStatus(id,status){
+  await fetch(API+'?action=setStatus',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status})});
+  load();
+}
+async function delTask(id){
+  if(!confirm('Hapus tugas ini?')) return;
+  await fetch(API+'?action=delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  load();
+}
+function taskHtml(t){
+  const s=STATUS[t.status], done=t.status==='approved'; let a='';
+  if(t.status==='todo') a+=`<button class="btn-req" onclick="setStatus(${t.id},'pending')">Ajukan Approval</button>`;
+  else if(t.status==='pending') a+=`<button class="btn-req" onclick="setStatus(${t.id},'todo')">Batalkan Pengajuan</button>`;
+  a+=`<button class="btn-foto" onclick="pickPhoto(${t.id})">📷 ${t.photo?'Ganti':'Upload'} Bukti</button>`;
+  a+=`<button class="btn-link" onclick="setLink(${t.id})">🔗 ${t.link?'Ubah':'Tambah'} Link</button>`;
+  if(t.date) a+=`<a class="btn-cal" href="${gcalUrl(t)}" target="_blank" rel="noopener">📆 + Calendar</a>`;
+  a+=`<button class="btn-del" onclick="delTask(${t.id})">Hapus</button>`;
+  const who = t.name ? `<b style="color:var(--gold-soft)">${escapeHtml(t.name)}</b> &middot; ` : '';
+  const sched = t.date ? `📅 ${fmtDay(t.date)} &middot; ` : '';
+  const linkHtml = t.link ? `<a class="tasklink" href="${escapeHtml(t.link)}" target="_blank" rel="noopener">🔗 ${escapeHtml(t.link)}</a>` : '';
+  const proof = t.photo ? `<a class="proof" href="${t.photo}" target="_blank"><img src="${t.photo}" alt="bukti"><span>Bukti diupload oleh <b>${escapeHtml(t.photoBy||'-')}</b><br>${fmtStamp(t.photoAt)} &middot; <span onclick="event.preventDefault();delPhoto(${t.id})" style="color:#e88;text-decoration:underline;cursor:pointer">hapus</span></span></a>` : '';
+  return `<div class="task ${done?'done':''}"><div class="task-top"><span class="task-title">${escapeHtml(t.title)}</span><span class="badge ${s.cls}">${s.label}</span></div><div class="task-meta">${sched}${who}dibuat ${fmtDate(t.created)}</div>${linkHtml}${proof}<div class="task-actions">${a}</div></div>`;
+}
+function draw(){
+  const items=cache.filter(t=>t.category===CATEGORY);
+  document.getElementById('count').textContent=items.length;
+  document.getElementById('list').innerHTML=items.length?items.map(taskHtml).join(''):'<div class="empty">Belum ada tugas</div>';
+}
+document.getElementById('photoInput').addEventListener('change', async e=>{
+  const file=e.target.files[0]; if(!file||photoTaskId==null) return;
+  try{
+    const dataUrl=await compressImage(file, 1280, 0.7);
+    const by=(document.getElementById('nameInput').value||'').trim() || localStorage.getItem('namaKaisarWok') || '';
+    const r=await fetch(API+'?action=photo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:photoTaskId, image:dataUrl, by})});
+    if(!r.ok) alert('Gagal upload foto.');
+  }catch(err){ alert('Gagal memproses foto.'); }
+  photoTaskId=null; load();
+});
+document.getElementById('nameInput').value = localStorage.getItem('namaKaisarWok') || '';
+document.getElementById('dateInput').value = todayStr();
+document.getElementById('nameInput').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('taskInput').focus(); });
+document.getElementById('taskInput').addEventListener('keydown',e=>{ if(e.key==='Enter') addTask(); });
+load();
+setInterval(load, 4000);
+</script>
+</body>
+</html>

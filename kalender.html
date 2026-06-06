@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalender — Kaisar Wok</title>
+<link rel="stylesheet" href="styles.css">
+<script src="auth.js"></script>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand-mini">
+    <img src="logo.png" alt="Kaisar Wok" class="logo-mini"
+         onerror="this.remove();document.getElementById('bm').style.display='flex';">
+    <div id="bm" style="display:none;align-items:center;gap:10px;">
+      <svg class="emblem-mini" viewBox="0 0 100 100" fill="none" stroke="#d4af37" stroke-width="3">
+        <circle cx="50" cy="50" r="46"/><path d="M27 57 Q50 80 73 57" stroke-linecap="round"/>
+        <path d="M44 52 q-5 -8 1 -13" stroke-width="2"/><path d="M52 52 q5 -8 -1 -13" stroke-width="2"/>
+      </svg>
+      <span class="mini-name">Kaisar Wok</span>
+    </div>
+  </div>
+  <span class="spacer"></span>
+  <a href="index.html">Beranda</a>
+  <a href="marketing.html">Marketing</a>
+  <a href="staff.html">Staff</a>
+  <a href="kalender.html" class="active">Kalender</a>
+  <a href="reservasi.html">Reservasi</a>
+  <a href="admin.html">Petinggi</a>
+</div>
+
+<div class="container">
+  <header class="page">
+    <h1>📅 Kalender Tugas</h1>
+    <p>Klik tanggal untuk melihat tugas hari itu</p>
+  </header>
+  <div class="center" style="margin-bottom:18px;">
+    <button onclick="subscribeGcal()" style="background:linear-gradient(180deg,#4f93ff,#2563eb);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">📅 Langganan ke Google Calendar</button>
+  </div>
+
+  <div class="card">
+    <div class="cal-head">
+      <button class="cal-nav" onclick="prevMonth()" title="Bulan sebelumnya">‹</button>
+      <div class="cal-title" id="calTitle"></div>
+      <button class="cal-nav" onclick="nextMonth()" title="Bulan berikutnya">›</button>
+    </div>
+    <div class="cal-grid" id="grid"></div>
+    <div class="legend">🔵 biru = jumlah tugas &middot; <b>🍽️ ungu = reservasi</b> &middot; kotak biru = terpilih &middot; garis biru = hari ini</div>
+  </div>
+
+  <div class="card">
+    <h2>📋 Tugas <span id="selDateLabel" style="font-size:13px;color:var(--muted);font-family:'Segoe UI',sans-serif;font-weight:400;"></span> <span class="count" id="selCount">0</span></h2>
+    <div id="selList"></div>
+  </div>
+
+  <p class="note">Tanggal diambil dari tugas yang dibuat di halaman Marketing & Staff.</p>
+</div>
+
+<!-- Modal tambah/edit reservasi -->
+<div class="modal-bg" id="resvModal" onclick="if(event.target===this)closeResvForm()">
+  <div class="modal">
+    <h3 id="modalTitle">Tambah Reservasi</h3>
+    <div class="mdate" id="modalDate"></div>
+    <label>Nama tamu</label>
+    <input id="mName" type="text" placeholder="Nama tamu">
+    <div class="modal-row">
+      <div><label>Jam</label><input id="mTime" type="time" style="color-scheme:light;"></div>
+      <div><label>Jumlah orang</label><input id="mPax" type="number" min="1" placeholder="cth: 4"></div>
+    </div>
+    <div class="modal-row">
+      <div><label>No. HP / WhatsApp</label><input id="mPhone" type="tel" placeholder="08xxxxxxxxxx"></div>
+      <div><label>DP / Uang Muka (Rp)</label><input id="mDp" type="number" min="0" placeholder="cth: 100000"></div>
+    </div>
+    <label>Catatan</label>
+    <textarea id="mNote" placeholder="cth: meja VIP, ulang tahun, alergi..."></textarea>
+    <div class="modal-actions">
+      <button class="m-cancel" onclick="closeResvForm()">Batal</button>
+      <button class="m-save" onclick="saveResvForm()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API='api.php';
+const STATUS={ todo:{label:'Dikerjakan',cls:'todo'}, pending:{label:'Menunggu Approval',cls:'pending'}, approved:{label:'✓ Selesai',cls:'approved'} };
+const CAT_LABEL={ marketing:'Marketing', staff:'Staff Lainnya' };
+let cache=[];
+const now=new Date();
+let viewY=now.getFullYear(), viewM=now.getMonth();
+function pad(n){ return String(n).padStart(2,'0'); }
+function todayStr(){ return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; }
+let selected=todayStr();
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDay(ds){ return new Date(ds+'T00:00').toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); }
+function fmtStamp(ts){ return new Date(ts).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+function gcalUrl(t){
+  if(!t.date) return '';
+  const start=t.date.replace(/-/g,'');
+  const d=new Date(t.date+'T00:00'); d.setDate(d.getDate()+1);
+  const end=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  const text=encodeURIComponent(`[${CAT_LABEL[t.category]||t.category}] ${t.title}`);
+  let det=`Oleh: ${t.name||'-'}`; if(t.link) det+=`\nLink: ${t.link}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${start}/${end}&details=${encodeURIComponent(det)}`;
+}
+function dateOf(t){
+  if(t.date) return t.date;
+  const d=new Date(t.created);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+let resvCache=[];
+async function load(){
+  try{
+    const [tr,rr]=await Promise.all([fetch(API+'?action=list'), fetch(API+'?action=resvList')]);
+    cache=await tr.json(); resvCache=await rr.json(); renderCal();
+  }catch(e){ console.error(e); }
+}
+function renderCal(){
+  const dow=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+  let html = dow.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const first=new Date(viewY, viewM, 1);
+  const startDow=first.getDay();
+  const daysInMonth=new Date(viewY, viewM+1, 0).getDate();
+  const counts={}, rcounts={};
+  cache.forEach(t=>{ const d=dateOf(t); counts[d]=(counts[d]||0)+1; });
+  resvCache.forEach(r=>{ rcounts[r.date]=(rcounts[r.date]||0)+1; });
+  for(let i=0;i<startDow;i++) html+='<div class="day empty"></div>';
+  const today=todayStr();
+  for(let d=1; d<=daysInMonth; d++){
+    const ds=`${viewY}-${pad(viewM+1)}-${pad(d)}`;
+    const c=counts[ds]||0, rc=rcounts[ds]||0;
+    let cls='day';
+    if(c>0||rc>0) cls+=' has-tasks';
+    if(ds===today) cls+=' today';
+    if(ds===selected) cls+=' selected';
+    const badges = (c||rc)?`<span class="badges">${c?`<span class="dcount">${c}</span>`:''}${rc?`<span class="rcount">🍽️${rc}</span>`:''}</span>`:'';
+    html+=`<button class="${cls}" onclick="selectDate('${ds}')"><span class="dnum">${d}</span>${badges}</button>`;
+  }
+  document.getElementById('grid').innerHTML=html;
+  document.getElementById('calTitle').textContent=first.toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+  renderSelected();
+}
+function renderSelected(){
+  const items=cache.filter(t=>dateOf(t)===selected)
+    .sort((a,b)=>a.category.localeCompare(b.category));
+  const resvs=resvCache.filter(r=>r.date===selected);
+  document.getElementById('selCount').textContent=items.length+resvs.length;
+  document.getElementById('selDateLabel').textContent='— '+fmtDay(selected);
+  let html='';
+  html+=`<div class="sectitle">📋 Tugas (${items.length})</div>`;
+  html+= items.length ? items.map(itemHtml).join('') : '<div class="empty">Tidak ada tugas</div>';
+  html+=`<div class="sectitle">🍽️ Reservasi (${resvs.length})</div>`;
+  html+=`<button class="btn-add-resv" onclick="openResvForm(null)">+ Tambah Reservasi tanggal ini</button>`;
+  html+= resvs.length ? resvs.map(resvLine).join('') : '<div class="empty">Belum ada reservasi</div>';
+  document.getElementById('selList').innerHTML=html;
+}
+function fmtRp(n){ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }
+function resvLine(r){
+  const when = r.time?`⏰ <b>${escapeHtml(r.time)}</b> &middot; `:'';
+  let extra=[]; if(r.pax) extra.push(r.pax+' org'); if(r.phone) extra.push('📞 '+escapeHtml(r.phone));
+  if(r.dp) extra.push('💰 DP '+fmtRp(r.dp));
+  if(r.note) extra.push(escapeHtml(r.note));
+  return `<div class="resv-line">
+    <div class="rn">🍽️ ${escapeHtml(r.name)}</div>
+    <div class="rd">${when}${extra.join(' &middot; ')}</div>
+    <div class="resv-line-actions">
+      <button class="btn-edit" onclick="openResvForm(${r.id})">✏️ Edit</button>
+      <button class="btn-del2" onclick="delResvCal(${r.id})">Hapus</button>
+    </div>
+  </div>`;
+}
+let editingResvId=null;
+function openResvForm(id){
+  editingResvId=id;
+  document.getElementById('modalDate').textContent='📅 '+fmtDay(selected);
+  if(id){
+    const r=resvCache.find(x=>x.id===id)||{};
+    document.getElementById('modalTitle').textContent='Edit Reservasi';
+    document.getElementById('mName').value=r.name||'';
+    document.getElementById('mTime').value=r.time||'';
+    document.getElementById('mPax').value=r.pax||'';
+    document.getElementById('mPhone').value=r.phone||'';
+    document.getElementById('mDp').value=r.dp||'';
+    document.getElementById('mNote').value=r.note||'';
+  } else {
+    document.getElementById('modalTitle').textContent='Tambah Reservasi';
+    ['mName','mTime','mPax','mPhone','mDp','mNote'].forEach(i=>document.getElementById(i).value='');
+  }
+  document.getElementById('resvModal').classList.add('show');
+}
+function closeResvForm(){ document.getElementById('resvModal').classList.remove('show'); editingResvId=null; }
+async function saveResvForm(){
+  const data={
+    name:document.getElementById('mName').value.trim(),
+    date:selected,
+    time:document.getElementById('mTime').value,
+    pax:document.getElementById('mPax').value,
+    phone:document.getElementById('mPhone').value.trim(),
+    dp:document.getElementById('mDp').value,
+    note:document.getElementById('mNote').value.trim()
+  };
+  if(!data.name){ alert('Isi nama tamu dulu.'); return; }
+  const action = editingResvId ? 'resvUpdate' : 'resvAdd';
+  if(editingResvId) data.id=editingResvId;
+  await fetch(API+'?action='+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  closeResvForm(); load();
+}
+async function delResvCal(id){
+  if(!confirm('Hapus reservasi ini?')) return;
+  await fetch(API+'?action=resvDelete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  load();
+}
+function itemHtml(t){
+  const s=STATUS[t.status], done=t.status==='approved';
+  const who=t.name?`<b style="color:var(--gold-soft)">${escapeHtml(t.name)}</b>`:'<span style="color:var(--muted)">tanpa nama</span>';
+  const proof=t.photo?`<a class="proof" href="${t.photo}" target="_blank"><img src="${t.photo}" alt="bukti"><span>📷 Bukti oleh <b>${escapeHtml(t.photoBy||'-')}</b><br>${fmtStamp(t.photoAt)}</span></a>`:'';
+  const linkHtml=t.link?`<br><a class="tasklink" href="${escapeHtml(t.link)}" target="_blank" rel="noopener">🔗 ${escapeHtml(t.link)}</a>`:'';
+  const gcal=t.date?`<br><a class="btn-cal" href="${gcalUrl(t)}" target="_blank" rel="noopener">📆 + Google Calendar</a>`:'';
+  return `<div class="task ${done?'done':''}">
+    <div class="task-top"><span class="task-title">${escapeHtml(t.title)}</span><span class="badge ${s.cls}">${s.label}</span></div>
+    <div class="task-meta"><span class="cat ${t.category}">${CAT_LABEL[t.category]}</span> oleh ${who}</div>${linkHtml}${proof}${gcal}
+  </div>`;
+}
+function subscribeGcal(){
+  const url = location.origin + '/ical.php';
+  if(navigator.clipboard) navigator.clipboard.writeText(url).catch(()=>{});
+  alert('Link kalender Kaisar Wok sudah disalin:\n\n'+url+'\n\nLangkah:\n1) Halaman Google Calendar akan terbuka.\n2) Klik "Tambahkan kalender > Dari URL".\n3) TEMPEL link di atas, lalu "Tambahkan kalender".\n\nSemua tugas akan otomatis muncul di Google Calendar kamu.');
+  window.open('https://calendar.google.com/calendar/u/0/r/settings/addbyurl','_blank');
+}
+function selectDate(ds){ selected=ds; renderCal(); }
+function prevMonth(){ viewM--; if(viewM<0){ viewM=11; viewY--; } renderCal(); }
+function nextMonth(){ viewM++; if(viewM>11){ viewM=0; viewY++; } renderCal(); }
+
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>
