@@ -234,6 +234,25 @@ header.page p{ color:var(--muted); margin-top:6px; font-size:14px; }
 .btn-approve{ background:linear-gradient(180deg,#34d399,#16a34a); color:#fff; box-shadow:0 3px 10px rgba(22,163,74,.25); }
 .btn-reject{ background:#fff; color:#dc2626; border-color:#fecaca; }
 
+/* Panduan ukuran banner/stiker (marketing) */
+.ref-card{ background:#fff; border:1px solid var(--line); border-left:4px solid var(--blue);
+  border-radius:14px; margin-bottom:22px; box-shadow:0 6px 18px rgba(37,99,235,.06); overflow:hidden; }
+.ref-card > summary{ cursor:pointer; list-style:none; padding:16px 18px; font-family:Georgia,serif;
+  font-weight:700; font-size:15px; color:var(--blue-deep); display:flex; align-items:center; gap:8px; }
+.ref-card > summary::-webkit-details-marker{ display:none; }
+.ref-card > summary::after{ content:'▾'; margin-left:auto; transition:transform .2s; }
+.ref-card[open] > summary::after{ transform:rotate(180deg); }
+.ref-card > summary:hover{ background:#f5f9ff; }
+.ref-body{ padding:4px 18px 16px; }
+.ref-item{ padding:12px 0; border-bottom:1px dashed var(--line); font-size:14px; color:var(--ink); }
+.ref-item:last-child{ border-bottom:none; }
+.ref-item b{ color:var(--blue-deep); }
+.ref-size{ display:inline-block; background:var(--blue-soft); color:var(--blue-dark); font-weight:700;
+  padding:3px 11px; border-radius:999px; font-size:12.5px; margin:5px 6px 0 0; }
+.ref-note{ color:var(--muted); font-size:12.5px; margin-top:5px; }
+.ref-sub{ margin:7px 0 0 16px; font-size:13.5px; }
+.ref-sub li{ margin:4px 0; }
+
 /* user chip (login) */
 .kw-user{ font-size:12px; color:var(--muted); display:inline-flex; align-items:center; gap:8px; font-weight:600; }
 .kw-user a{ color:#dc2626; text-decoration:underline; font-weight:700; cursor:pointer; }
