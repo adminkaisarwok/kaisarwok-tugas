@@ -252,6 +252,14 @@ header.page p{ color:var(--muted); margin-top:6px; font-size:14px; }
 .ref-note{ color:var(--muted); font-size:12.5px; margin-top:5px; }
 .ref-sub{ margin:7px 0 0 16px; font-size:13.5px; }
 .ref-sub li{ margin:4px 0; }
+.ref-wrap{ overflow-x:auto; }
+.ref-table{ width:100%; border-collapse:collapse; font-size:13.5px; min-width:520px; }
+.ref-table th,.ref-table td{ text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+.ref-table thead th{ background:var(--blue-soft); color:var(--blue-dark); font-weight:700; font-size:12px;
+  text-transform:uppercase; letter-spacing:.5px; }
+.ref-table tbody tr:nth-child(even){ background:#f7faff; }
+.ref-table .uk{ font-weight:700; color:var(--blue-deep); white-space:nowrap; }
+.ref-table .no{ color:var(--muted); font-weight:700; text-align:center; width:34px; }
 
 /* user chip (login) */
 .kw-user{ font-size:12px; color:var(--muted); display:inline-flex; align-items:center; gap:8px; font-weight:600; }
