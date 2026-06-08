@@ -57,19 +57,15 @@
         </table>
       </div>
 
-      <div class="ref-cat-title">📝 Catatan</div>
-      <div class="ref-wrap">
-        <table class="ref-table two">
-          <thead>
-            <tr><th>Catatan</th><th>Keterangan</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Sebelum cetak</td><td>Cek ejaan, harga, dan logo Kaisar Wok sudah benar</td></tr>
-            <tr><td>File desain</td><td>Pakai mode warna CMYK & resolusi tinggi; simpan master untuk dipakai ulang saat event</td></tr>
-            <tr><td>Banner dekat blower</td><td>Tampilkan foto menu saja, TANPA harga</td></tr>
-            <tr><td>Saat ada event</td><td>Siapkan standing banner promo & voucher lebih awal</td></tr>
-          </tbody>
-        </table>
+      <div class="ref-cat-title">📝 Catatan <span style="font-weight:400;font-size:12px;color:var(--muted);">— klik selnya untuk mengetik, bisa tambah baris/kolom</span></div>
+      <div class="notes-wrap">
+        <table class="notes-table" id="notesTable"></table>
+      </div>
+      <div class="notes-toolbar">
+        <button class="notes-btn" onclick="notesAddRow()">+ Baris</button>
+        <button class="notes-btn" onclick="notesAddCol()">+ Kolom</button>
+        <button class="notes-btn notes-save" onclick="notesSave()">💾 Simpan</button>
+        <span class="notes-status" id="notesStatus"></span>
       </div>
     </div>
   </details>
@@ -202,6 +198,42 @@ document.getElementById('nameInput').addEventListener('keydown',e=>{ if(e.key===
 document.getElementById('taskInput').addEventListener('keydown',e=>{ if(e.key==='Enter') addTask(); });
 load();
 setInterval(load, 4000); // sinkron otomatis tiap 4 detik
+
+/* ===== Catatan Marketing (tabel bisa diedit) ===== */
+let NOTES={columns:['Catatan','Keterangan'],rows:[]};
+function notesDirty(){ document.getElementById('notesStatus').textContent='• belum disimpan'; }
+function notesRender(){
+  let html='<thead><tr>';
+  NOTES.columns.forEach((c,j)=>{
+    html+=`<th><div class="notes-th"><div class="notes-cell" contenteditable spellcheck="false" oninput="NOTES.columns[${j}]=this.textContent;notesDirty()">${escapeHtml(c)}</div><button class="notes-delcol" title="Hapus kolom" onclick="notesDelCol(${j})">×</button></div></th>`;
+  });
+  html+='<th class="notes-actions-col"></th></tr></thead><tbody>';
+  NOTES.rows.forEach((r,ri)=>{
+    html+='<tr>';
+    NOTES.columns.forEach((c,ci)=>{
+      html+=`<td><div class="notes-cell" contenteditable spellcheck="false" oninput="NOTES.rows[${ri}][${ci}]=this.textContent;notesDirty()">${escapeHtml(r[ci]||'')}</div></td>`;
+    });
+    html+=`<td class="notes-actions-col"><button class="notes-delrow" title="Hapus baris" onclick="notesDelRow(${ri})">×</button></td></tr>`;
+  });
+  html+='</tbody>';
+  document.getElementById('notesTable').innerHTML=html;
+}
+function notesAddRow(){ NOTES.rows.push(new Array(NOTES.columns.length).fill('')); notesRender(); notesDirty(); }
+function notesAddCol(){ const n=prompt('Nama kolom baru:','Kolom'); if(n===null) return; NOTES.columns.push(n||'Kolom'); NOTES.rows.forEach(r=>r.push('')); notesRender(); notesDirty(); }
+function notesDelRow(i){ NOTES.rows.splice(i,1); notesRender(); notesDirty(); }
+function notesDelCol(j){ if(NOTES.columns.length<=1){ alert('Minimal harus ada 1 kolom.'); return; } NOTES.columns.splice(j,1); NOTES.rows.forEach(r=>r.splice(j,1)); notesRender(); notesDirty(); }
+async function notesLoad(){
+  try{ const r=await fetch(API+'?action=notesGet'); const d=await r.json(); if(d&&d.columns){ NOTES=d; } notesRender(); document.getElementById('notesStatus').textContent=''; }catch(e){ console.error(e); }
+}
+async function notesSave(){
+  const st=document.getElementById('notesStatus'); st.textContent='Menyimpan…';
+  try{
+    const r=await fetch(API+'?action=notesSave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({columns:NOTES.columns,rows:NOTES.rows})});
+    st.textContent = r.ok ? '✓ Tersimpan' : 'Gagal menyimpan';
+    if(r.ok) setTimeout(()=>{ st.textContent=''; }, 2500);
+  }catch(e){ st.textContent='Gagal terhubung'; }
+}
+notesLoad();
 </script>
 </body>
 </html>

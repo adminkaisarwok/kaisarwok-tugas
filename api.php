@@ -198,6 +198,41 @@ try {
     out(['ok' => true]);
   }
 
+  /* ---- Catatan Marketing (tabel bisa diedit) ---- */
+  if ($action === 'notesGet') {
+    $q = $pdo->prepare("SELECT v FROM settings WHERE k='marketing_notes'"); $q->execute();
+    $row = $q->fetch();
+    $data = ($row && $row['v']) ? json_decode($row['v'], true) : null;
+    if (empty($data) || empty($data['columns'])) {
+      $data = ['columns' => ['Catatan', 'Keterangan'], 'rows' => [
+        ['Sebelum cetak', 'Cek ejaan, harga, dan logo Kaisar Wok sudah benar'],
+        ['File desain', 'Pakai mode warna CMYK & resolusi tinggi; simpan master untuk event'],
+        ['Banner dekat blower', 'Tampilkan foto menu saja, TANPA harga'],
+        ['Saat ada event', 'Siapkan standing banner promo & voucher lebih awal'],
+      ]];
+    }
+    out($data);
+  }
+  if ($action === 'notesSave' && $method === 'POST') {
+    $b = body();
+    $cols = $b['columns'] ?? [];
+    $rows = $b['rows'] ?? [];
+    if (!is_array($cols) || !is_array($rows) || count($cols) < 1) { http_response_code(400); out(['error' => 'Data tidak valid']); }
+    $cols = array_slice(array_values(array_map(function ($c) { return mb_substr(trim((string) $c), 0, 60); }, $cols)), 0, 12);
+    $nc = count($cols);
+    $clean = [];
+    foreach (array_slice($rows, 0, 300) as $r) {
+      if (!is_array($r)) continue;
+      $cells = [];
+      for ($i = 0; $i < $nc; $i++) { $cells[] = mb_substr((string) ($r[$i] ?? ''), 0, 1000); }
+      $clean[] = $cells;
+    }
+    $v = json_encode(['columns' => $cols, 'rows' => $clean], JSON_UNESCAPED_UNICODE);
+    $pdo->prepare("DELETE FROM settings WHERE k='marketing_notes'")->execute();
+    $pdo->prepare("INSERT INTO settings (k,v) VALUES ('marketing_notes', ?)")->execute([$v]);
+    out(['ok' => true]);
+  }
+
   http_response_code(404);
   out(['error' => 'Aksi tidak dikenal']);
 

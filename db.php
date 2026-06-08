@@ -44,6 +44,12 @@ function db() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     // tambah kolom 'dp' kalau tabel reservasi sudah ada sebelumnya
     try { $pdo->exec("ALTER TABLE reservations ADD COLUMN dp BIGINT DEFAULT 0"); } catch (Exception $e) { /* sudah ada */ }
+
+    // penyimpanan umum (mis. catatan marketing yang bisa diedit)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS settings (
+      k VARCHAR(64) PRIMARY KEY,
+      v MEDIUMTEXT
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
   }
   return $pdo;
 }
