@@ -14,6 +14,29 @@ function currentUser() { return $_SESSION['user'] ?? null; }
 function requireLogin() { if (empty($_SESSION['user'])) { http_response_code(401); out(['error' => 'Silakan login dulu']); } }
 function requirePetinggi() { requireLogin(); if ($_SESSION['user']['role'] !== 'petinggi') { http_response_code(403); out(['error' => 'Khusus petinggi']); } }
 
+// daftar tabel editable yang diizinkan + isi default-nya
+function notesDefault($key) {
+  if ($key === 'marketing_ukuran') {
+    return ['columns' => ['Jenis Materi', 'Ukuran', 'Keterangan'], 'rows' => [
+      ['Banner Canopy', '750 cm × 5 m', 'Yang biasa dipasang'],
+      ['Standing Banner', '180 × 80 cm', 'Menu best seller · menu rekomendasi · promo mingguan / 3 harian'],
+      ['Banner Samping / Dekat Blower', '1 m × 5 m', 'Seluruh foto menu TANPA harga — cukup nama + foto'],
+      ['Kartu Apresiasi', '1536 × 1024 px', '—'],
+      ['Stiker Hampers', '5 × 8 cm', 'Sudut membulat'],
+      ['Stiker Hampers', '10,5 × 4 cm', 'Tanpa sudut'],
+      ['Stiker Take Away', 'D3 · D4 · D5', 'Ukuran take away'],
+      ['Voucher', '15 × 6,1 cm', '1 sisi, potong + cacah'],
+    ]];
+  }
+  return ['columns' => ['Catatan', 'Keterangan'], 'rows' => [
+    ['Sebelum cetak', 'Cek ejaan, harga, dan logo Kaisar Wok sudah benar'],
+    ['File desain', 'Pakai CMYK & resolusi tinggi; simpan master untuk event'],
+    ['Banner dekat blower', 'Foto menu saja, TANPA harga'],
+    ['Saat ada event', 'Siapkan standing banner promo & voucher lebih awal'],
+  ]];
+}
+function notesAllowed($key) { return in_array($key, ['marketing_notes', 'marketing_ukuran'], true); }
+
 $action = $_GET['action'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'];
 $CATEGORIES = ['marketing', 'staff'];
@@ -198,23 +221,20 @@ try {
     out(['ok' => true]);
   }
 
-  /* ---- Catatan Marketing (tabel bisa diedit) ---- */
+  /* ---- Tabel Marketing yang bisa diedit (ukuran & catatan) ---- */
   if ($action === 'notesGet') {
-    $q = $pdo->prepare("SELECT v FROM settings WHERE k='marketing_notes'"); $q->execute();
+    $key = (string) ($_GET['key'] ?? 'marketing_notes');
+    if (!notesAllowed($key)) { http_response_code(400); out(['error' => 'key tidak valid']); }
+    $q = $pdo->prepare("SELECT v FROM settings WHERE k=?"); $q->execute([$key]);
     $row = $q->fetch();
     $data = ($row && $row['v']) ? json_decode($row['v'], true) : null;
-    if (empty($data) || empty($data['columns'])) {
-      $data = ['columns' => ['Catatan', 'Keterangan'], 'rows' => [
-        ['Sebelum cetak', 'Cek ejaan, harga, dan logo Kaisar Wok sudah benar'],
-        ['File desain', 'Pakai mode warna CMYK & resolusi tinggi; simpan master untuk event'],
-        ['Banner dekat blower', 'Tampilkan foto menu saja, TANPA harga'],
-        ['Saat ada event', 'Siapkan standing banner promo & voucher lebih awal'],
-      ]];
-    }
+    if (empty($data) || empty($data['columns'])) { $data = notesDefault($key); }
     out($data);
   }
   if ($action === 'notesSave' && $method === 'POST') {
     $b = body();
+    $key = (string) ($b['key'] ?? 'marketing_notes');
+    if (!notesAllowed($key)) { http_response_code(400); out(['error' => 'key tidak valid']); }
     $cols = $b['columns'] ?? [];
     $rows = $b['rows'] ?? [];
     if (!is_array($cols) || !is_array($rows) || count($cols) < 1) { http_response_code(400); out(['error' => 'Data tidak valid']); }
@@ -228,8 +248,8 @@ try {
       $clean[] = $cells;
     }
     $v = json_encode(['columns' => $cols, 'rows' => $clean], JSON_UNESCAPED_UNICODE);
-    $pdo->prepare("DELETE FROM settings WHERE k='marketing_notes'")->execute();
-    $pdo->prepare("INSERT INTO settings (k,v) VALUES ('marketing_notes', ?)")->execute([$v]);
+    $pdo->prepare("DELETE FROM settings WHERE k=?")->execute([$key]);
+    $pdo->prepare("INSERT INTO settings (k,v) VALUES (?, ?)")->execute([$key, $v]);
     out(['ok' => true]);
   }
 
