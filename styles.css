@@ -279,6 +279,10 @@ header.page p{ color:var(--muted); margin-top:6px; font-size:14px; }
 .notes-btn:hover{ border-color:var(--blue); }
 .notes-save{ background:linear-gradient(180deg,#4f93ff,#2563eb); color:#fff; border-color:transparent; }
 .notes-status{ font-size:12px; color:var(--muted); margin-left:auto; }
+.catatan-box{ width:100%; min-height:130px; resize:vertical; padding:14px; border:1px solid #d8e3f5;
+  border-radius:12px; font-size:14px; font-family:inherit; line-height:1.6; background:#f7faff; color:var(--ink); }
+.catatan-box:focus{ outline:none; border-color:var(--blue); background:#fff; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+.catatan-box::placeholder{ color:#9aa7bd; }
 
 /* user chip (login) */
 .kw-user{ font-size:12px; color:var(--muted); display:inline-flex; align-items:center; gap:8px; font-weight:600; }

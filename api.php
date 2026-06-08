@@ -253,6 +253,25 @@ try {
     out(['ok' => true]);
   }
 
+  /* ---- Catatan teks bebas (kotak tulis) ---- */
+  if ($action === 'textGet') {
+    $key = (string) ($_GET['key'] ?? '');
+    if ($key !== 'marketing_catatan') { http_response_code(400); out(['error' => 'key tidak valid']); }
+    $q = $pdo->prepare("SELECT v FROM settings WHERE k=?"); $q->execute([$key]); $row = $q->fetch();
+    $text = ($row && $row['v'] !== null) ? $row['v']
+      : "• Sebelum cetak: cek ejaan, harga, dan logo Kaisar Wok sudah benar\n• File desain: pakai CMYK & resolusi tinggi; simpan master untuk event\n• Banner dekat blower: foto menu saja, TANPA harga\n• Saat ada event: siapkan standing banner promo & voucher lebih awal";
+    out(['text' => $text]);
+  }
+  if ($action === 'textSave' && $method === 'POST') {
+    $b = body();
+    $key = (string) ($b['key'] ?? '');
+    if ($key !== 'marketing_catatan') { http_response_code(400); out(['error' => 'key tidak valid']); }
+    $text = mb_substr((string) ($b['text'] ?? ''), 0, 20000);
+    $pdo->prepare("DELETE FROM settings WHERE k=?")->execute([$key]);
+    $pdo->prepare("INSERT INTO settings (k,v) VALUES (?, ?)")->execute([$key, $text]);
+    out(['ok' => true]);
+  }
+
   http_response_code(404);
   out(['error' => 'Aksi tidak dikenal']);
 

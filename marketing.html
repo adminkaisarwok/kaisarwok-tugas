@@ -50,15 +50,11 @@
         <span class="notes-status" id="st_ukuran"></span>
       </div>
 
-      <div class="ref-cat-title" style="margin-top:26px;">📝 Catatan <span style="font-weight:400;font-size:12px;color:var(--muted);">— bisa tambah baris/kolom sendiri</span></div>
-      <div class="notes-wrap">
-        <table class="notes-table" id="tbl_notes"></table>
-      </div>
+      <div class="ref-cat-title" style="margin-top:26px;">📝 Catatan <span style="font-weight:400;font-size:12px;color:var(--muted);">— tulis bebas di sini</span></div>
+      <textarea id="catatanBox" class="catatan-box" placeholder="Tulis catatan apa saja di sini... (bisa banyak baris)"></textarea>
       <div class="notes-toolbar">
-        <button class="notes-btn" onclick="etAddRow('marketing_notes')">+ Baris</button>
-        <button class="notes-btn" onclick="etAddCol('marketing_notes')">+ Kolom</button>
-        <button class="notes-btn notes-save" onclick="etSave('marketing_notes')">💾 Simpan</button>
-        <span class="notes-status" id="st_notes"></span>
+        <button class="notes-btn notes-save" onclick="catatanSave()">💾 Simpan Catatan</button>
+        <span class="notes-status" id="st_catatan"></span>
       </div>
     </div>
   </details>
@@ -194,8 +190,7 @@ setInterval(load, 4000); // sinkron otomatis tiap 4 detik
 
 /* ===== Tabel Marketing yang bisa diedit (ukuran & catatan) ===== */
 const ET = {
-  marketing_ukuran: { table:'tbl_ukuran', status:'st_ukuran', columns:[], rows:[] },
-  marketing_notes:  { table:'tbl_notes',  status:'st_notes',  columns:[], rows:[] }
+  marketing_ukuran: { table:'tbl_ukuran', status:'st_ukuran', columns:[], rows:[] }
 };
 function etDirty(k){ document.getElementById(ET[k].status).textContent='• belum disimpan'; }
 function etRender(k){
@@ -230,7 +225,22 @@ async function etSave(k){
   }catch(e){ st.textContent='Gagal terhubung'; }
 }
 etLoad('marketing_ukuran');
-etLoad('marketing_notes');
+
+/* ===== Kotak Catatan (teks bebas) ===== */
+async function catatanLoad(){
+  try{ const r=await fetch(API+'?action=textGet&key=marketing_catatan'); const d=await r.json();
+    document.getElementById('catatanBox').value=d.text||''; document.getElementById('st_catatan').textContent=''; }catch(e){ console.error(e); }
+}
+async function catatanSave(){
+  const st=document.getElementById('st_catatan'); st.textContent='Menyimpan…';
+  try{
+    const r=await fetch(API+'?action=textSave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:'marketing_catatan',text:document.getElementById('catatanBox').value})});
+    st.textContent = r.ok ? '✓ Tersimpan' : 'Gagal menyimpan';
+    if(r.ok) setTimeout(()=>{ st.textContent=''; }, 2500);
+  }catch(e){ st.textContent='Gagal terhubung'; }
+}
+document.getElementById('catatanBox').addEventListener('input',()=>{ document.getElementById('st_catatan').textContent='• belum disimpan'; });
+catatanLoad();
 </script>
 </body>
 </html>
