@@ -300,24 +300,6 @@ try {
   if ($action === 'gcalStatus') {
     out(['enabled' => gcal_enabled()]);
   }
-  if ($action === 'gcalDebug') {
-    requirePetinggi();
-    $info = ['curl' => function_exists('curl_init'), 'openssl' => function_exists('openssl_sign'), 'creds' => gcal_creds() !== null];
-    $c = gcal_creds();
-    if ($c) {
-      $now = time();
-      $b64 = function ($d) { return rtrim(strtr(base64_encode($d), '+/', '-_'), '='); };
-      $uns = $b64(json_encode(['alg' => 'RS256', 'typ' => 'JWT'])) . '.' . $b64(json_encode(['iss' => $c['email'], 'scope' => 'https://www.googleapis.com/auth/calendar', 'aud' => 'https://oauth2.googleapis.com/token', 'iat' => $now, 'exp' => $now + 3600]));
-      $sig = '';
-      $info['sign_ok'] = openssl_sign($uns, $sig, $c['key'], OPENSSL_ALGO_SHA256);
-      if ($info['sign_ok']) {
-        $jwt = $uns . '.' . $b64($sig);
-        $resp = gcal_http('POST', 'https://oauth2.googleapis.com/token', null, http_build_query(['grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer', 'assertion' => $jwt]), 'application/x-www-form-urlencoded');
-        $info['token_resp'] = substr((string) $resp, 0, 400);
-      }
-    }
-    out($info);
-  }
   if ($action === 'gcalSetCalendar' && $method === 'POST') {
     requirePetinggi();
     $cid = trim((string) (body()['calendarId'] ?? ''));
