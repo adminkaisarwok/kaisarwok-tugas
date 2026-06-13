@@ -1,6 +1,9 @@
 # Rahasia — JANGAN di-commit (berisi password DB & akun)
 config.php
 
+# Kredensial Google Calendar (service account) — rahasia
+google-credentials.json
+
 # Foto bukti yang diupload (data runtime)
 uploads/*
 !uploads/.gitkeep

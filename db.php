@@ -29,6 +29,7 @@ function db() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     // tambah kolom 'link' kalau tabel sudah dibuat sebelumnya (tanpa kolom ini)
     try { $pdo->exec("ALTER TABLE tasks ADD COLUMN link VARCHAR(500) DEFAULT ''"); } catch (Exception $e) { /* kolom sudah ada */ }
+    try { $pdo->exec("ALTER TABLE tasks ADD COLUMN gcal_id VARCHAR(128) DEFAULT NULL"); } catch (Exception $e) { /* sudah ada */ }
 
     // tabel reservasi tamu
     $pdo->exec("CREATE TABLE IF NOT EXISTS reservations (
@@ -44,6 +45,7 @@ function db() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     // tambah kolom 'dp' kalau tabel reservasi sudah ada sebelumnya
     try { $pdo->exec("ALTER TABLE reservations ADD COLUMN dp BIGINT DEFAULT 0"); } catch (Exception $e) { /* sudah ada */ }
+    try { $pdo->exec("ALTER TABLE reservations ADD COLUMN gcal_id VARCHAR(128) DEFAULT NULL"); } catch (Exception $e) { /* sudah ada */ }
 
     // penyimpanan umum (mis. catatan marketing yang bisa diedit)
     $pdo->exec("CREATE TABLE IF NOT EXISTS settings (

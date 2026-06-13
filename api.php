@@ -6,6 +6,7 @@
 header('Content-Type: application/json; charset=utf-8');
 session_start();
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/gcal.php';
 
 function body() { $j = json_decode(file_get_contents('php://input'), true); return is_array($j) ? $j : []; }
 function out($d) { echo json_encode($d); exit; }
@@ -96,7 +97,14 @@ try {
     if (!in_array($category, $CATEGORIES)) { http_response_code(400); out(['error' => 'Kategori tidak valid']); }
     $stmt = $pdo->prepare("INSERT INTO tasks (title,name,category,date,status,created,link) VALUES (?,?,?,?,'todo',?,?)");
     $stmt->execute([$title, $name, $category, $date, ms(), $link]);
-    out(['ok' => true, 'id' => (int) $pdo->lastInsertId()]);
+    $newId = (int) $pdo->lastInsertId();
+    if ($date && gcal_enabled()) {
+      $catLabel = $category === 'marketing' ? 'Marketing' : 'Staff';
+      $desc = 'Kategori: ' . $catLabel . ($name ? ' • Oleh: ' . $name : '') . ($link ? ' • Link: ' . $link : '');
+      $ev = gcal_upsert(null, $title, $desc, $date, '');
+      if ($ev) $pdo->prepare("UPDATE tasks SET gcal_id=? WHERE id=?")->execute([$ev, $newId]);
+    }
+    out(['ok' => true, 'id' => $newId]);
   }
 
   /* ---- ubah status (approve perlu password petinggi) ---- */
@@ -120,8 +128,9 @@ try {
   /* ---- hapus tugas (+ fotonya) ---- */
   if ($action === 'delete' && $method === 'POST') {
     $b = body(); $id = (int) ($b['id'] ?? 0);
-    $q = $pdo->prepare("SELECT photo FROM tasks WHERE id=?"); $q->execute([$id]); $t = $q->fetch();
+    $q = $pdo->prepare("SELECT photo, gcal_id FROM tasks WHERE id=?"); $q->execute([$id]); $t = $q->fetch();
     if ($t && $t['photo']) { @unlink(__DIR__ . '/' . ltrim($t['photo'], '/')); }
+    if ($t && !empty($t['gcal_id'])) gcal_delete($t['gcal_id']);
     $pdo->prepare("DELETE FROM tasks WHERE id=?")->execute([$id]);
     out(['ok' => true]);
   }
@@ -189,7 +198,14 @@ try {
     if ($pax < 0) $pax = 0;
     $stmt = $pdo->prepare("INSERT INTO reservations (name,date,time,pax,phone,note,dp,created) VALUES (?,?,?,?,?,?,?,?)");
     $stmt->execute([$name, $date, $time, $pax, $phone, $note, $dp, ms()]);
-    out(['ok' => true, 'id' => (int) $pdo->lastInsertId()]);
+    $rid = (int) $pdo->lastInsertId();
+    if (gcal_enabled()) {
+      $sum = 'Reservasi: ' . $name . ($pax ? " ($pax org)" : '');
+      $d = []; if ($phone) $d[] = 'HP: ' . $phone; if ($dp) $d[] = 'DP: Rp' . number_format($dp, 0, ',', '.'); if ($note) $d[] = $note;
+      $ev = gcal_upsert(null, $sum, implode(' • ', $d), $date, $time, 120);
+      if ($ev) $pdo->prepare("UPDATE reservations SET gcal_id=? WHERE id=?")->execute([$ev, $rid]);
+    }
+    out(['ok' => true, 'id' => $rid]);
   }
 
   /* ---- ubah reservasi ---- */
@@ -207,16 +223,24 @@ try {
     if (!preg_match('/^\d{2}:\d{2}$/', $time)) $time = '';
     if ($name === '') { http_response_code(400); out(['error' => 'Nama tamu kosong']); }
     if ($pax < 0) $pax = 0;
-    $q = $pdo->prepare("SELECT id FROM reservations WHERE id=?"); $q->execute([$id]);
-    if (!$q->fetch()) { http_response_code(404); out(['error' => 'Reservasi tidak ditemukan']); }
+    $q = $pdo->prepare("SELECT gcal_id FROM reservations WHERE id=?"); $q->execute([$id]); $cur = $q->fetch();
+    if (!$cur) { http_response_code(404); out(['error' => 'Reservasi tidak ditemukan']); }
     $pdo->prepare("UPDATE reservations SET name=?,date=?,time=?,pax=?,phone=?,note=?,dp=? WHERE id=?")
         ->execute([$name, $date, $time, $pax, $phone, $note, $dp, $id]);
+    if (gcal_enabled()) {
+      $sum = 'Reservasi: ' . $name . ($pax ? " ($pax org)" : '');
+      $d = []; if ($phone) $d[] = 'HP: ' . $phone; if ($dp) $d[] = 'DP: Rp' . number_format($dp, 0, ',', '.'); if ($note) $d[] = $note;
+      $ev = gcal_upsert($cur['gcal_id'] ?? null, $sum, implode(' • ', $d), $date, $time, 120);
+      if ($ev && $ev !== ($cur['gcal_id'] ?? null)) $pdo->prepare("UPDATE reservations SET gcal_id=? WHERE id=?")->execute([$ev, $id]);
+    }
     out(['ok' => true]);
   }
 
   /* ---- hapus reservasi ---- */
   if ($action === 'resvDelete' && $method === 'POST') {
     $b = body(); $id = (int) ($b['id'] ?? 0);
+    $q = $pdo->prepare("SELECT gcal_id FROM reservations WHERE id=?"); $q->execute([$id]); $cur = $q->fetch();
+    if ($cur && !empty($cur['gcal_id'])) gcal_delete($cur['gcal_id']);
     $pdo->prepare("DELETE FROM reservations WHERE id=?")->execute([$id]);
     out(['ok' => true]);
   }
@@ -270,6 +294,29 @@ try {
     $pdo->prepare("DELETE FROM settings WHERE k=?")->execute([$key]);
     $pdo->prepare("INSERT INTO settings (k,v) VALUES (?, ?)")->execute([$key, $text]);
     out(['ok' => true]);
+  }
+
+  /* ---- Google Calendar: status & sinkron data lama ---- */
+  if ($action === 'gcalStatus') {
+    out(['enabled' => gcal_enabled()]);
+  }
+  if ($action === 'gcalSync' && $method === 'POST') {
+    requirePetinggi();
+    if (!gcal_enabled()) { out(['ok' => false, 'error' => 'Google Calendar belum diaktifkan di server']); }
+    $n = 0;
+    foreach ($pdo->query("SELECT * FROM tasks WHERE date <> '' AND (gcal_id IS NULL OR gcal_id='')")->fetchAll() as $t) {
+      $catLabel = $t['category'] === 'marketing' ? 'Marketing' : 'Staff';
+      $desc = 'Kategori: ' . $catLabel . ($t['name'] ? ' • Oleh: ' . $t['name'] : '') . (!empty($t['link']) ? ' • Link: ' . $t['link'] : '');
+      $ev = gcal_upsert(null, $t['title'], $desc, $t['date'], '');
+      if ($ev) { $pdo->prepare("UPDATE tasks SET gcal_id=? WHERE id=?")->execute([$ev, $t['id']]); $n++; }
+    }
+    foreach ($pdo->query("SELECT * FROM reservations WHERE (gcal_id IS NULL OR gcal_id='')")->fetchAll() as $r) {
+      $sum = 'Reservasi: ' . $r['name'] . ($r['pax'] ? " ({$r['pax']} org)" : '');
+      $d = []; if ($r['phone']) $d[] = 'HP: ' . $r['phone']; if (!empty($r['dp'])) $d[] = 'DP: Rp' . number_format($r['dp'], 0, ',', '.'); if ($r['note']) $d[] = $r['note'];
+      $ev = gcal_upsert(null, $sum, implode(' • ', $d), $r['date'], $r['time'], 120);
+      if ($ev) { $pdo->prepare("UPDATE reservations SET gcal_id=? WHERE id=?")->execute([$ev, $r['id']]); $n++; }
+    }
+    out(['ok' => true, 'synced' => $n]);
   }
 
   http_response_code(404);
