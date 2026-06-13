@@ -14,11 +14,16 @@ function gcal_creds() {
   if ($c !== false) return $c;
   $c = null;
   $f = __DIR__ . '/google-credentials.json';
-  if (is_file($f) && defined('GCAL_CALENDAR_ID') && GCAL_CALENDAR_ID) {
-    $j = json_decode(file_get_contents($f), true);
-    if (!empty($j['client_email']) && !empty($j['private_key'])) {
-      $c = ['email' => $j['client_email'], 'key' => $j['private_key'], 'cal' => GCAL_CALENDAR_ID];
-    }
+  if (!is_file($f)) return $c;
+  // ID kalender: dari config.php (define) ATAU dari DB settings
+  $calId = (defined('GCAL_CALENDAR_ID') && GCAL_CALENDAR_ID) ? GCAL_CALENDAR_ID : '';
+  if (!$calId) {
+    try { $row = db()->query("SELECT v FROM settings WHERE k='gcal_calendar_id'")->fetch(); if ($row && $row['v']) $calId = $row['v']; } catch (Exception $e) {}
+  }
+  if (!$calId) return $c;
+  $j = json_decode(file_get_contents($f), true);
+  if (!empty($j['client_email']) && !empty($j['private_key'])) {
+    $c = ['email' => $j['client_email'], 'key' => $j['private_key'], 'cal' => $calId];
   }
   return $c;
 }

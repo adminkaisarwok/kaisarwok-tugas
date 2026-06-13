@@ -300,6 +300,14 @@ try {
   if ($action === 'gcalStatus') {
     out(['enabled' => gcal_enabled()]);
   }
+  if ($action === 'gcalSetCalendar' && $method === 'POST') {
+    requirePetinggi();
+    $cid = trim((string) (body()['calendarId'] ?? ''));
+    if ($cid === '') { http_response_code(400); out(['error' => 'calendarId kosong']); }
+    $pdo->prepare("DELETE FROM settings WHERE k='gcal_calendar_id'")->execute();
+    $pdo->prepare("INSERT INTO settings (k,v) VALUES ('gcal_calendar_id', ?)")->execute([$cid]);
+    out(['ok' => true]);
+  }
   if ($action === 'gcalSync' && $method === 'POST') {
     requirePetinggi();
     if (!gcal_enabled()) { out(['ok' => false, 'error' => 'Google Calendar belum diaktifkan di server']); }
